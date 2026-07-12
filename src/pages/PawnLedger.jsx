@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { calcInterest, isOverdue } from '../lib/pawnCalc'
+import { nextDueDate, daysUntil } from '../lib/bankLoanCalc'
 
 const emptyForm = {
   customer_id: '',
@@ -97,6 +98,7 @@ export default function PawnLedger() {
       repledge_interest_rate: pledge.repledge_interest_rate || '',
       repledge_rate_unit: pledge.repledge_rate_unit || 'monthly',
       repledge_date: pledge.repledge_date || new Date().toISOString().slice(0, 10),
+      repledge_cycle_months: pledge.repledge_cycle_months || 12,
       repledge_notes: pledge.repledge_notes || '',
     } : {
       repledge_party_type: 'bank',
@@ -105,13 +107,14 @@ export default function PawnLedger() {
       repledge_interest_rate: '',
       repledge_rate_unit: 'monthly',
       repledge_date: new Date().toISOString().slice(0, 10),
+      repledge_cycle_months: 12,
       repledge_notes: '',
     })
   }
 
   const handleSaveRepledge = async (e) => {
     e.preventDefault()
-    await supabase.from('pledges').update({
+    const { error } = await supabase.from('pledges').update({
       is_repledged: true,
       repledge_party_type: repledgeForm.repledge_party_type,
       repledge_party_name: repledgeForm.repledge_party_name,
@@ -119,19 +122,28 @@ export default function PawnLedger() {
       repledge_interest_rate: parseFloat(repledgeForm.repledge_interest_rate) || null,
       repledge_rate_unit: repledgeForm.repledge_rate_unit,
       repledge_date: repledgeForm.repledge_date,
+      repledge_cycle_months: parseInt(repledgeForm.repledge_cycle_months) || 12,
       repledge_notes: repledgeForm.repledge_notes,
       repledge_returned_date: null,
     }).eq('id', repledgeTarget.id)
+    if (error) {
+      alert('Re-pledge save failed: ' + error.message + '\n\nMost likely cause: supabase/schema_repledge.sql has not been run yet in the Supabase SQL Editor.')
+      return
+    }
     setRepledgeTarget(null)
     load()
   }
 
   const handleMarkReturned = async (pledge) => {
     if (!confirm('Mark this item as returned from the bank/person (re-pledge closed)?')) return
-    await supabase.from('pledges').update({
+    const { error } = await supabase.from('pledges').update({
       is_repledged: false,
       repledge_returned_date: new Date().toISOString().slice(0, 10),
     }).eq('id', pledge.id)
+    if (error) {
+      alert('Update failed: ' + error.message)
+      return
+    }
     load()
   }
 
@@ -242,22 +254,30 @@ export default function PawnLedger() {
                   </div>
                 </div>
 
-                {p.is_repledged && (
-                  <div className="mt-2 pt-2 border-t border-dashed border-charcoal/10 text-xs text-charcoal/60">
-                    <p>
-                      Re-pledged to <span className="font-medium">{p.repledge_party_name}</span> ({p.repledge_party_type})
-                      {p.repledge_amount ? ` for ₹${Number(p.repledge_amount).toLocaleString('en-IN')}` : ''}
-                      {p.repledge_interest_rate ? ` @ ${p.repledge_interest_rate}%/${p.repledge_rate_unit === 'annual' ? 'yr' : 'mo'}` : ''}
-                    </p>
-                    {p.repledge_interest_rate && (
-                      <p className="text-emerald mt-0.5">
-                        Margin ≈ {(
-                          p.interest_rate - (p.repledge_rate_unit === 'annual' ? p.repledge_interest_rate / 12 : p.repledge_interest_rate)
-                        ).toFixed(2)}%/mo you keep
+                {p.is_repledged && (() => {
+                  const repDue = nextDueDate(p.repledge_date, p.repledge_cycle_months || 12)
+                  const repDays = daysUntil(repDue)
+                  let repBadge = { text: `Repledge due in ${repDays}d`, cls: 'text-charcoal/50' }
+                  if (repDays < 0) repBadge = { text: `Repledge OVERDUE ${Math.abs(repDays)}d`, cls: 'text-red-600 font-medium' }
+                  else if (repDays <= 20) repBadge = { text: `Repledge due in ${repDays}d`, cls: 'text-gold-dark font-medium' }
+                  return (
+                    <div className="mt-2 pt-2 border-t border-dashed border-charcoal/10 text-xs text-charcoal/60">
+                      <p>
+                        Re-pledged to <span className="font-medium">{p.repledge_party_name}</span> ({p.repledge_party_type})
+                        {p.repledge_amount ? ` for ₹${Number(p.repledge_amount).toLocaleString('en-IN')}` : ''}
+                        {p.repledge_interest_rate ? ` @ ${p.repledge_interest_rate}%/${p.repledge_rate_unit === 'annual' ? 'yr' : 'mo'}` : ''}
                       </p>
-                    )}
-                  </div>
-                )}
+                      {p.repledge_interest_rate && (
+                        <p className="text-emerald mt-0.5">
+                          Margin ≈ {(
+                            p.interest_rate - (p.repledge_rate_unit === 'annual' ? p.repledge_interest_rate / 12 : p.repledge_interest_rate)
+                          ).toFixed(2)}%/mo you keep
+                        </p>
+                      )}
+                      <p className={`mt-0.5 ${repBadge.cls}`}>{repBadge.text} ({repDue.toISOString().slice(0, 10)})</p>
+                    </div>
+                  )
+                })()}
 
                 {p.status === 'active' && (
                   <div className="flex gap-2 mt-3">
@@ -425,6 +445,12 @@ export default function PawnLedger() {
                   <option value="monthly">% / month</option>
                   <option value="annual">% / year</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-xs text-charcoal/50 mb-1">Completion / due cycle (months)</label>
+                <input type="number" value={repledgeForm.repledge_cycle_months}
+                  onChange={(e) => setRepledgeForm({ ...repledgeForm, repledge_cycle_months: e.target.value })}
+                  className="w-full px-3 py-2 rounded border border-charcoal/20 bg-white" />
               </div>
               <textarea placeholder="Notes" value={repledgeForm.repledge_notes}
                 onChange={(e) => setRepledgeForm({ ...repledgeForm, repledge_notes: e.target.value })}

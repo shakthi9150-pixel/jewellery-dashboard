@@ -11,6 +11,7 @@ const emptyForm = {
 export default function BankLoans() {
   const [loans, setLoans] = useState([])
   const [payments, setPayments] = useState({}) // loan_id -> [payments]
+  const [repledges, setRepledges] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(emptyForm)
@@ -31,6 +32,14 @@ export default function BankLoans() {
       })
       setPayments(grouped)
     }
+
+    const { data: repledgeData } = await supabase
+      .from('pledges')
+      .select('*, customers(name, phone)')
+      .eq('is_repledged', true)
+      .order('repledge_date', { ascending: false })
+    setRepledges(repledgeData || [])
+
     setLoading(false)
   }
 
@@ -151,6 +160,49 @@ export default function BankLoans() {
                     </button>
                   </div>
                 )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Re-pledged Items Section */}
+      <h2 className="font-display text-lg text-maroon-dark mt-10 mb-3">Re-pledged Items</h2>
+      <p className="text-xs text-charcoal/50 font-tamil mb-3">மறு அடகு வைத்த பொருட்கள் (customer items you've re-pledged to a bank/person)</p>
+      {repledges.length === 0 ? (
+        <div className="bg-white rounded-lg p-6 text-center text-charcoal/40 border border-dashed border-charcoal/20">
+          No items currently re-pledged. Mark an item as re-pledged from the Pawn Ledger.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {repledges.map((p) => {
+            const due = nextDueDate(p.repledge_date, p.repledge_cycle_months || 12)
+            const days = daysUntil(due)
+            let badge = { text: `Due in ${days}d`, cls: 'bg-emerald/10 text-emerald' }
+            if (days < 0) badge = { text: `Overdue ${Math.abs(days)}d`, cls: 'bg-red-100 text-red-700' }
+            else if (days <= 20) badge = { text: `Due in ${days}d`, cls: 'bg-gold/20 text-gold-dark' }
+
+            return (
+              <div key={p.id} className="bg-white rounded-lg shadow-sm p-4 border border-blue-100">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-medium text-charcoal">{p.repledge_party_name}</p>
+                    <p className="text-xs text-charcoal/50 capitalize">{p.repledge_party_type} · {p.item_description}</p>
+                  </div>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap ${badge.cls}`}>{badge.text}</span>
+                </div>
+                <p className="text-xs text-charcoal/40 mt-1">Customer's item: {p.customers?.name} · {p.customers?.phone}</p>
+                <div className="mt-3 pt-3 border-t border-charcoal/10 grid grid-cols-2 gap-2 text-center text-sm">
+                  <div>
+                    <p className="text-charcoal/40 text-xs">Amount</p>
+                    <p className="font-medium">₹{Number(p.repledge_amount || 0).toLocaleString('en-IN')}</p>
+                  </div>
+                  <div>
+                    <p className="text-charcoal/40 text-xs">Rate</p>
+                    <p className="font-medium">{p.repledge_interest_rate}%/{p.repledge_rate_unit === 'annual' ? 'yr' : 'mo'}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-charcoal/40 mt-2">Due: {due.toISOString().slice(0, 10)} (pledged {p.repledge_date})</p>
               </div>
             )
           })}
