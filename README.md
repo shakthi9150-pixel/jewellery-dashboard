@@ -2,7 +2,7 @@
 
 Personal business dashboard for Pawn Broking + Jewellery Sale. Phase 1 of 5.
 
-## Phase 1-4 - Ready now
+## All Phases Complete ✅
 - Login (Supabase Auth)
 - Customer management (add/edit/delete/search, KYC fields)
 - Business Settings (name, GSTIN, address, GST rate, pawn interest rate)
@@ -13,19 +13,23 @@ Personal business dashboard for Pawn Broking + Jewellery Sale. Phase 1 of 5.
   multi-line items with HSN codes, auto CGST/SGST split, printable invoice view
 - **Books**: simplified income/expense ledger, monthly summary, auto-includes
   invoice revenue as income
-- **Bank Loans**: multi-bank loan tracking, annual (or custom cycle) interest
-  due date tracking, overdue/due-soon badges, interest payment recording,
-  payment history per loan
-- Dashboard home with live customer count, active pledges, and bank interest
-  due-soon count
+- **Bank Loans**: multi-bank loan tracking, interest due date tracking,
+  overdue/due-soon badges, interest payment recording, payment history
+- **Rate Sharing**: daily 22K/24K gold + silver rate entry, rate history,
+  one-tap WhatsApp share to a single customer or broadcast to all customers
+- Dashboard home with live stats (customers, active pledges, bank interest
+  due soon) and today's rate + quick action links
 
-## Phase 5 - Coming next
-- Daily gold/silver rate + WhatsApp share
+## Running the Phase 5 SQL
+After schema.sql, schema_phase2.sql, schema_phase3.sql, schema_phase4.sql,
+also run `supabase/schema_phase5.sql` in the Supabase SQL Editor. This adds
+the `metal_rates` table.
 
-## Running Phase 4 SQL
-After schema.sql, schema_phase2.sql, schema_phase3.sql, also run
-`supabase/schema_phase4.sql` in the Supabase SQL Editor. This adds
-`bank_loans` and `bank_loan_payments` tables.
+## Possible future additions (not built)
+- KYC document viewer/download in Customers page
+- Pledge auction workflow (beyond the overdue flag)
+- Export Books to Excel/PDF for accountant handoff
+- Bulk customer/pledge import from existing paper notes
 
 ## Setup
 

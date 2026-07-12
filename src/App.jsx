@@ -10,7 +10,7 @@ import Invoices from './pages/Invoices'
 import InvoiceView from './pages/InvoiceView'
 import Books from './pages/Books'
 import BankLoans from './pages/BankLoans'
-import PlaceholderPage from './pages/PlaceholderPage'
+import Rates from './pages/Rates'
 
 function ProtectedRoute({ children }) {
   const { session, loading } = useAuth()
@@ -31,9 +31,7 @@ export default function App() {
       <Route path="/invoices/:id" element={<ProtectedRoute><InvoiceView /></ProtectedRoute>} />
       <Route path="/books" element={<ProtectedRoute><Books /></ProtectedRoute>} />
       <Route path="/bank-loans" element={<ProtectedRoute><BankLoans /></ProtectedRoute>} />
-      <Route path="/rates" element={
-        <ProtectedRoute><PlaceholderPage title="Rate Sharing" tamil="விலை பகிர்வு" phase="Phase 5" /></ProtectedRoute>
-      } />
+      <Route path="/rates" element={<ProtectedRoute><Rates /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

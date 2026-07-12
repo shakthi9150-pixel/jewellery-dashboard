@@ -8,7 +8,7 @@ const navItems = [
   { to: '/invoices', label: 'GST Invoices', tamil: 'விலைப்பட்டியல்', icon: '▤' },
   { to: '/books', label: 'Books', tamil: 'கணக்குப் புத்தகம்', icon: '📖' },
   { to: '/bank-loans', label: 'Bank Loans', tamil: 'வங்கி கடன்', icon: '⛁' },
-  { to: '/rates', label: 'Rate Sharing', tamil: 'விலை பகிர்வு', icon: '◉', phase: 5 },
+  { to: '/rates', label: 'Rate Sharing', tamil: 'விலை பகிர்வு', icon: '◉' },
   { to: '/settings', label: 'Settings', tamil: 'அமைப்புகள்', icon: '⚙' },
 ]
 
