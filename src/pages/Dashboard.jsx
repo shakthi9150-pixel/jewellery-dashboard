@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
+import { nextDueDate, daysUntil } from '../lib/bankLoanCalc'
 
 export default function Dashboard() {
   const [customerCount, setCustomerCount] = useState(null)
   const [activePledges, setActivePledges] = useState(null)
+  const [dueSoonLoans, setDueSoonLoans] = useState(null)
   const [businessName, setBusinessName] = useState('')
 
   useEffect(() => {
@@ -19,6 +21,21 @@ export default function Dashboard() {
       .eq('status', 'active')
       .then(({ count }) => setActivePledges(count ?? 0))
 
+    Promise.all([
+      supabase.from('bank_loans').select('*').eq('status', 'active'),
+      supabase.from('bank_loan_payments').select('loan_id, payment_date').order('payment_date', { ascending: false }),
+    ]).then(([{ data: loanData }, { data: paymentData }]) => {
+      const lastPaymentByLoan = {}
+      ;(paymentData || []).forEach((p) => {
+        if (!lastPaymentByLoan[p.loan_id]) lastPaymentByLoan[p.loan_id] = p.payment_date
+      })
+      const dueSoon = (loanData || []).filter((loan) => {
+        const due = nextDueDate(loan.loan_date, loan.interest_cycle_months, lastPaymentByLoan[loan.id])
+        return daysUntil(due) <= 15
+      })
+      setDueSoonLoans(dueSoon.length)
+    })
+
     supabase
       .from('business_settings')
       .select('business_name')
@@ -28,7 +45,6 @@ export default function Dashboard() {
   }, [])
 
   const phaseCards = [
-    { title: 'Bank Loans', tamil: 'வங்கி கடன்', phase: 'Phase 4', desc: 'Multi-bank interest due tracking', to: '/bank-loans' },
     { title: 'Rate Sharing', tamil: 'விலை பகிர்வு', phase: 'Phase 5', desc: 'Daily gold/silver rate + share', to: '/rates' },
   ]
 
@@ -48,9 +64,9 @@ export default function Dashboard() {
           <p className="text-sm text-charcoal/50">Active Pledges</p>
           <p className="font-display text-3xl text-maroon mt-1">{activePledges ?? '—'}</p>
         </div>
-        <div className="bg-white rounded-lg p-5 border-l-4 border-charcoal/20 shadow-sm">
-          <p className="text-sm text-charcoal/50">Bank Interest Due</p>
-          <p className="font-display text-3xl text-charcoal/30 mt-1">Phase 4</p>
+        <div className="bg-white rounded-lg p-5 border-l-4 border-gold shadow-sm">
+          <p className="text-sm text-charcoal/50">Bank Interest Due (15d)</p>
+          <p className="font-display text-3xl text-maroon mt-1">{dueSoonLoans ?? '—'}</p>
         </div>
       </div>
 

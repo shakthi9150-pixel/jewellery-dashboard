@@ -7,7 +7,7 @@ const navItems = [
   { to: '/pawn-ledger', label: 'Pawn Ledger', tamil: 'அடகு பதிவு', icon: '◈' },
   { to: '/invoices', label: 'GST Invoices', tamil: 'விலைப்பட்டியல்', icon: '▤' },
   { to: '/books', label: 'Books', tamil: 'கணக்குப் புத்தகம்', icon: '📖' },
-  { to: '/bank-loans', label: 'Bank Loans', tamil: 'வங்கி கடன்', icon: '⛁', phase: 4 },
+  { to: '/bank-loans', label: 'Bank Loans', tamil: 'வங்கி கடன்', icon: '⛁' },
   { to: '/rates', label: 'Rate Sharing', tamil: 'விலை பகிர்வு', icon: '◉', phase: 5 },
   { to: '/settings', label: 'Settings', tamil: 'அமைப்புகள்', icon: '⚙' },
 ]

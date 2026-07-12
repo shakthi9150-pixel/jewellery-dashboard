@@ -2,7 +2,7 @@
 
 Personal business dashboard for Pawn Broking + Jewellery Sale. Phase 1 of 5.
 
-## Phase 1 + 2 + 3 - Ready now
+## Phase 1-4 - Ready now
 - Login (Supabase Auth)
 - Customer management (add/edit/delete/search, KYC fields)
 - Business Settings (name, GSTIN, address, GST rate, pawn interest rate)
@@ -13,17 +13,19 @@ Personal business dashboard for Pawn Broking + Jewellery Sale. Phase 1 of 5.
   multi-line items with HSN codes, auto CGST/SGST split, printable invoice view
 - **Books**: simplified income/expense ledger, monthly summary, auto-includes
   invoice revenue as income
-- Dashboard home with live customer count + active pledges count
+- **Bank Loans**: multi-bank loan tracking, annual (or custom cycle) interest
+  due date tracking, overdue/due-soon badges, interest payment recording,
+  payment history per loan
+- Dashboard home with live customer count, active pledges, and bank interest
+  due-soon count
 
-## Phase 4-5 - Coming next
-- Bank Loan tracker (multi-bank, interest due dates)
+## Phase 5 - Coming next
 - Daily gold/silver rate + WhatsApp share
 
-## Running Phase 3 SQL
-After schema.sql and schema_phase2.sql, also run `supabase/schema_phase3.sql`
-in the Supabase SQL Editor. This adds `invoices`, `invoice_items`,
-`invoice_counters`, `ledger_entries` tables and the `next_invoice_number()`
-function for financial-year-wise auto numbering.
+## Running Phase 4 SQL
+After schema.sql, schema_phase2.sql, schema_phase3.sql, also run
+`supabase/schema_phase4.sql` in the Supabase SQL Editor. This adds
+`bank_loans` and `bank_loan_payments` tables.
 
 ## Setup
 
