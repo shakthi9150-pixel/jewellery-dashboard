@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { calcInterest, isOverdue } from '../lib/pawnCalc'
-import { nextDueDate, daysUntil } from '../lib/bankLoanCalc'
+import { nextDueDate, daysUntil, estimateInterestDue, toAnnualRate } from '../lib/bankLoanCalc'
 
 const emptyForm = {
   customer_id: '',
@@ -28,6 +28,7 @@ export default function PawnLedger() {
   const [redeemTarget, setRedeemTarget] = useState(null)
   const [repledgeTarget, setRepledgeTarget] = useState(null)
   const [repledgeForm, setRepledgeForm] = useState(null)
+  const [returnTarget, setReturnTarget] = useState(null)
 
   const load = async () => {
     setLoading(true)
@@ -134,16 +135,31 @@ export default function PawnLedger() {
     load()
   }
 
-  const handleMarkReturned = async (pledge) => {
-    if (!confirm('Mark this item as returned from the bank/person (re-pledge closed)?')) return
+  const openReturn = (pledge) => {
+    const annualRate = toAnnualRate(pledge.repledge_interest_rate || 0, pledge.repledge_rate_unit)
+    const suggested = estimateInterestDue(pledge.repledge_amount || 0, annualRate, pledge.repledge_cycle_months || 12)
+    setReturnTarget({ ...pledge, suggestedAmount: suggested })
+  }
+
+  const handleConfirmReturn = async (pledge, finalAmount, paymentDate) => {
+    if (finalAmount && finalAmount > 0) {
+      const { error: payErr } = await supabase.from('repledge_payments').insert([{
+        pledge_id: pledge.id, amount: finalAmount, payment_date: paymentDate, notes: 'Final payment on return',
+      }])
+      if (payErr) {
+        alert('Failed to record final payment: ' + payErr.message)
+        return
+      }
+    }
     const { error } = await supabase.from('pledges').update({
       is_repledged: false,
-      repledge_returned_date: new Date().toISOString().slice(0, 10),
+      repledge_returned_date: paymentDate,
     }).eq('id', pledge.id)
     if (error) {
       alert('Update failed: ' + error.message)
       return
     }
+    setReturnTarget(null)
     load()
   }
 
@@ -295,7 +311,7 @@ export default function PawnLedger() {
                     </button>
                     {p.is_repledged && (
                       <button
-                        onClick={() => handleMarkReturned(p)}
+                        onClick={() => openReturn(p)}
                         className="text-sm bg-charcoal/10 text-charcoal/60 px-3 rounded font-medium hover:bg-charcoal/20"
                       >
                         Returned
@@ -465,6 +481,40 @@ export default function PawnLedger() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Return from Re-pledge Modal */}
+      {returnTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="bg-cream rounded-lg shadow-2xl w-full max-w-sm p-6">
+            <h2 className="font-display text-lg text-maroon-dark mb-1">Mark as Returned</h2>
+            <p className="text-sm text-charcoal/60 mb-4">
+              {returnTarget.item_description} — from {returnTarget.repledge_party_name}
+            </p>
+            <label className="block text-sm font-medium mb-1">Return Date</label>
+            <input type="date" id="return-date" defaultValue={new Date().toISOString().slice(0, 10)}
+              className="w-full px-3 py-2 rounded border border-charcoal/20 bg-white mb-3" />
+            <label className="block text-sm font-medium mb-1">Final Interest Paid (₹)</label>
+            <input type="number" id="return-amount" defaultValue={returnTarget.suggestedAmount}
+              className="w-full px-3 py-2 rounded border border-charcoal/20 bg-white mb-1" />
+            <p className="text-xs text-charcoal/40 mb-4">Set to 0 if no interest was due on this final payment.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleConfirmReturn(
+                  returnTarget,
+                  parseFloat(document.getElementById('return-amount').value) || 0,
+                  document.getElementById('return-date').value
+                )}
+                className="flex-1 bg-emerald text-cream py-2 rounded font-medium hover:opacity-90"
+              >
+                Confirm Return
+              </button>
+              <button onClick={() => setReturnTarget(null)} className="flex-1 bg-charcoal/10 text-charcoal py-2 rounded font-medium hover:bg-charcoal/20">
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
