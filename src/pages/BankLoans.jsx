@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { nextDueDate, daysUntil, estimateInterestDue } from '../lib/bankLoanCalc'
+import { nextDueDate, daysUntil, estimateInterestDue, toAnnualRate } from '../lib/bankLoanCalc'
 
 const emptyForm = {
   bank_name: '', branch: '', loan_account_number: '', loan_amount: '',
@@ -12,6 +12,8 @@ export default function BankLoans() {
   const [loans, setLoans] = useState([])
   const [payments, setPayments] = useState({}) // loan_id -> [payments]
   const [repledges, setRepledges] = useState([])
+  const [repledgePayments, setRepledgePayments] = useState({}) // pledge_id -> [payments]
+  const [repayTarget, setRepayTarget] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(emptyForm)
@@ -40,7 +42,24 @@ export default function BankLoans() {
       .order('repledge_date', { ascending: false })
     setRepledges(repledgeData || [])
 
+    if (repledgeData?.length) {
+      const { data: repayData } = await supabase.from('repledge_payments').select('*').order('payment_date', { ascending: false })
+      const grouped = {}
+      ;(repayData || []).forEach((p) => {
+        grouped[p.pledge_id] = grouped[p.pledge_id] || []
+        grouped[p.pledge_id].push(p)
+      })
+      setRepledgePayments(grouped)
+    }
+
     setLoading(false)
+  }
+
+  const handleRecordRepledgePayment = async (pledge, amount, date) => {
+    const { error } = await supabase.from('repledge_payments').insert([{ pledge_id: pledge.id, amount, payment_date: date }])
+    if (error) { alert('Failed to record payment: ' + error.message); return }
+    setRepayTarget(null)
+    load()
   }
 
   useEffect(() => { load() }, [])
@@ -176,8 +195,13 @@ export default function BankLoans() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {repledges.map((p) => {
-            const due = nextDueDate(p.repledge_date, p.repledge_cycle_months || 12)
+            const paymentsForPledge = repledgePayments[p.id] || []
+            const lastPayment = paymentsForPledge[0]
+            const totalPaid = paymentsForPledge.reduce((s, pay) => s + Number(pay.amount), 0)
+            const due = nextDueDate(p.repledge_date, p.repledge_cycle_months || 12, lastPayment?.payment_date)
             const days = daysUntil(due)
+            const annualRate = toAnnualRate(p.repledge_interest_rate || 0, p.repledge_rate_unit)
+            const estInterest = estimateInterestDue(p.repledge_amount || 0, annualRate, p.repledge_cycle_months || 12)
             let badge = { text: `Due in ${days}d`, cls: 'bg-emerald/10 text-emerald' }
             if (days < 0) badge = { text: `Overdue ${Math.abs(days)}d`, cls: 'bg-red-100 text-red-700' }
             else if (days <= 20) badge = { text: `Due in ${days}d`, cls: 'bg-gold/20 text-gold-dark' }
@@ -192,7 +216,7 @@ export default function BankLoans() {
                   <span className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap ${badge.cls}`}>{badge.text}</span>
                 </div>
                 <p className="text-xs text-charcoal/40 mt-1">Customer's item: {p.customers?.name} · {p.customers?.phone}</p>
-                <div className="mt-3 pt-3 border-t border-charcoal/10 grid grid-cols-2 gap-2 text-center text-sm">
+                <div className="mt-3 pt-3 border-t border-charcoal/10 grid grid-cols-3 gap-2 text-center text-sm">
                   <div>
                     <p className="text-charcoal/40 text-xs">Amount</p>
                     <p className="font-medium">₹{Number(p.repledge_amount || 0).toLocaleString('en-IN')}</p>
@@ -201,8 +225,21 @@ export default function BankLoans() {
                     <p className="text-charcoal/40 text-xs">Rate</p>
                     <p className="font-medium">{p.repledge_interest_rate}%/{p.repledge_rate_unit === 'annual' ? 'yr' : 'mo'}</p>
                   </div>
+                  <div>
+                    <p className="text-charcoal/40 text-xs">Paid so far</p>
+                    <p className="font-medium text-maroon">₹{totalPaid.toLocaleString('en-IN')}</p>
+                  </div>
                 </div>
-                <p className="text-xs text-charcoal/40 mt-2">Due: {due.toISOString().slice(0, 10)} (pledged {p.repledge_date})</p>
+                <p className="text-xs text-charcoal/40 mt-2">
+                  Due: {due.toISOString().slice(0, 10)}
+                  {lastPayment && ` · Last paid ${lastPayment.payment_date}`}
+                </p>
+                <button
+                  onClick={() => setRepayTarget({ ...p, computedInterest: estInterest })}
+                  className="mt-3 w-full text-sm bg-emerald/10 text-emerald py-1.5 rounded font-medium hover:bg-emerald/20"
+                >
+                  Record Interest Payment
+                </button>
               </div>
             )
           })}
@@ -280,6 +317,37 @@ export default function BankLoans() {
                 Confirm
               </button>
               <button onClick={() => setPayTarget(null)} className="flex-1 bg-charcoal/10 text-charcoal py-2 rounded font-medium hover:bg-charcoal/20">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Repledge Payment Modal */}
+      {repayTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="bg-cream rounded-lg shadow-2xl w-full max-w-sm p-6">
+            <h2 className="font-display text-lg text-maroon-dark mb-2">Record Re-pledge Interest Payment</h2>
+            <p className="text-sm text-charcoal/60 mb-4">{repayTarget.repledge_party_name} — {repayTarget.item_description}</p>
+            <label className="block text-sm font-medium mb-1">Payment Date</label>
+            <input type="date" id="repay-date" defaultValue={new Date().toISOString().slice(0, 10)}
+              className="w-full px-3 py-2 rounded border border-charcoal/20 bg-white mb-3" />
+            <label className="block text-sm font-medium mb-1">Amount Paid (₹)</label>
+            <input type="number" id="repay-amount" defaultValue={repayTarget.computedInterest}
+              className="w-full px-3 py-2 rounded border border-charcoal/20 bg-white mb-4" />
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleRecordRepledgePayment(
+                  repayTarget,
+                  parseFloat(document.getElementById('repay-amount').value),
+                  document.getElementById('repay-date').value
+                )}
+                className="flex-1 bg-emerald text-cream py-2 rounded font-medium hover:opacity-90"
+              >
+                Confirm
+              </button>
+              <button onClick={() => setRepayTarget(null)} className="flex-1 bg-charcoal/10 text-charcoal py-2 rounded font-medium hover:bg-charcoal/20">
                 Cancel
               </button>
             </div>

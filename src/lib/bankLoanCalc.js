@@ -18,3 +18,8 @@ export function estimateInterestDue(loanAmount, annualRatePercent, cycleMonths) 
   const amount = (loanAmount * annualRatePercent * (cycleMonths / 12)) / 100
   return Math.round(amount * 100) / 100
 }
+
+// Converts a monthly or annual rate into an annual-equivalent rate
+export function toAnnualRate(rate, unit) {
+  return unit === 'monthly' ? rate * 12 : rate
+}

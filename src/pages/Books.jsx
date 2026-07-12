@@ -11,6 +11,7 @@ const emptyForm = { entry_date: new Date().toISOString().slice(0, 10), entry_typ
 export default function Books() {
   const [entries, setEntries] = useState([])
   const [invoiceRevenue, setInvoiceRevenue] = useState(0)
+  const [repledgeInterestPaid, setRepledgeInterestPaid] = useState(0)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(emptyForm)
@@ -21,12 +22,14 @@ export default function Books() {
     const monthStart = `${month}-01`
     const monthEnd = new Date(new Date(monthStart).getFullYear(), new Date(monthStart).getMonth() + 1, 0).toISOString().slice(0, 10)
 
-    const [{ data: entryData }, { data: invData }] = await Promise.all([
+    const [{ data: entryData }, { data: invData }, { data: repayData }] = await Promise.all([
       supabase.from('ledger_entries').select('*').gte('entry_date', monthStart).lte('entry_date', monthEnd).order('entry_date', { ascending: false }),
       supabase.from('invoices').select('total_amount').gte('invoice_date', monthStart).lte('invoice_date', monthEnd),
+      supabase.from('repledge_payments').select('amount').gte('payment_date', monthStart).lte('payment_date', monthEnd),
     ])
     setEntries(entryData || [])
     setInvoiceRevenue((invData || []).reduce((s, i) => s + Number(i.total_amount), 0))
+    setRepledgeInterestPaid((repayData || []).reduce((s, r) => s + Number(r.amount), 0))
     setLoading(false)
   }
 
@@ -34,10 +37,11 @@ export default function Books() {
 
   const { totalIncome, totalExpense, net } = useMemo(() => {
     const manualIncome = entries.filter((e) => e.entry_type === 'income').reduce((s, e) => s + Number(e.amount), 0)
-    const expense = entries.filter((e) => e.entry_type === 'expense').reduce((s, e) => s + Number(e.amount), 0)
+    const manualExpense = entries.filter((e) => e.entry_type === 'expense').reduce((s, e) => s + Number(e.amount), 0)
     const income = manualIncome + invoiceRevenue
+    const expense = manualExpense + repledgeInterestPaid
     return { totalIncome: income, totalExpense: expense, net: income - expense }
-  }, [entries, invoiceRevenue])
+  }, [entries, invoiceRevenue, repledgeInterestPaid])
 
   const openNew = (type) => {
     setForm({ ...emptyForm, entry_type: type, category: CATEGORIES[type][0] })
@@ -81,6 +85,9 @@ export default function Books() {
         <div className="bg-white rounded-lg p-4 border-l-4 border-maroon shadow-sm">
           <p className="text-xs text-charcoal/50">Total Expense</p>
           <p className="font-display text-2xl text-maroon mt-1">₹{totalExpense.toLocaleString('en-IN')}</p>
+          {repledgeInterestPaid > 0 && (
+            <p className="text-[11px] text-charcoal/40 mt-1">incl. ₹{repledgeInterestPaid.toLocaleString('en-IN')} re-pledge interest paid</p>
+          )}
         </div>
         <div className="bg-white rounded-lg p-4 border-l-4 border-gold shadow-sm">
           <p className="text-xs text-charcoal/50">Net</p>
