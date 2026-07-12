@@ -84,14 +84,12 @@ export default function Rates() {
     window.open(url, '_blank')
   }
 
-  const broadcastAll = () => {
-    if (!confirm(`Open WhatsApp share for all ${customers.length} customers, one tab each?`)) return
-    customers.forEach((c) => {
-      if (!c.phone) return
-      let phone = c.phone.replace(/\D/g, '')
-      if (phone.length === 10) phone = '91' + phone
-      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(buildMessage())}`, '_blank')
-    })
+  const [copied, setCopied] = useState(false)
+
+  const copyMessage = async () => {
+    await navigator.clipboard.writeText(buildMessage())
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   return (
@@ -158,13 +156,19 @@ export default function Rates() {
           </div>
 
           <button onClick={shareViaWhatsApp}
-            className="w-full bg-emerald text-cream py-2 rounded font-medium hover:opacity-90 mb-2">
+            className="w-full bg-emerald text-cream py-2 rounded font-medium hover:opacity-90 mb-3">
             Share to Selected Customer
           </button>
-          <button onClick={broadcastAll}
-            className="w-full bg-gold/10 text-gold-dark py-2 rounded font-medium hover:bg-gold/20 text-sm">
-            Share to All Customers ({customers.length}) — opens one tab per customer
-          </button>
+
+          <div className="border-t border-charcoal/10 pt-3">
+            <p className="text-xs text-charcoal/50 mb-2">
+              To send to <b>all customers at once</b>, use a WhatsApp Broadcast List (set up once in your phone: WhatsApp → Menu → New Broadcast → add all customer numbers). Then copy today's message here and paste it into that broadcast list.
+            </p>
+            <button onClick={copyMessage}
+              className="w-full bg-gold/10 text-gold-dark py-2 rounded font-medium hover:bg-gold/20 text-sm">
+              {copied ? 'Copied ✓' : 'Copy Rate Message'}
+            </button>
+          </div>
         </div>
       </div>
 
