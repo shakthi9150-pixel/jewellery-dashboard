@@ -2,26 +2,28 @@
 
 Personal business dashboard for Pawn Broking + Jewellery Sale. Phase 1 of 5.
 
-## Phase 1 + 2 - Ready now
+## Phase 1 + 2 + 3 - Ready now
 - Login (Supabase Auth)
 - Customer management (add/edit/delete/search, KYC fields)
 - Business Settings (name, GSTIN, address, GST rate, pawn interest rate)
 - **Pawn Ledger**: pledge entry with item photo upload, weight, loan amount,
-  auto interest calculation (simple interest, partial month = full month),
-  active/redeemed/auctioned status, overdue flagging based on redemption period,
+  auto interest calculation, active/redeemed/auctioned status, overdue flagging,
   redemption workflow
+- **GST Invoices**: financial-year-wise auto numbering (e.g. `2026-27/001`),
+  multi-line items with HSN codes, auto CGST/SGST split, printable invoice view
+- **Books**: simplified income/expense ledger, monthly summary, auto-includes
+  invoice revenue as income
 - Dashboard home with live customer count + active pledges count
 
-## Phase 3-5 - Coming next
-- GST Invoices + simplified books
+## Phase 4-5 - Coming next
 - Bank Loan tracker (multi-bank, interest due dates)
 - Daily gold/silver rate + WhatsApp share
 
-## Running Phase 2 SQL
-After Phase 1's `supabase/schema.sql`, also run `supabase/schema_phase2.sql`
-in the Supabase SQL Editor. This adds the `pledges` table and a public
-`pledge-photos` storage bucket (separate from the private `documents` bucket
-used for KYC docs).
+## Running Phase 3 SQL
+After schema.sql and schema_phase2.sql, also run `supabase/schema_phase3.sql`
+in the Supabase SQL Editor. This adds `invoices`, `invoice_items`,
+`invoice_counters`, `ledger_entries` tables and the `next_invoice_number()`
+function for financial-year-wise auto numbering.
 
 ## Setup
 

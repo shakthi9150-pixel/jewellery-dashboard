@@ -6,6 +6,9 @@ import Dashboard from './pages/Dashboard'
 import Customers from './pages/Customers'
 import Settings from './pages/Settings'
 import PawnLedger from './pages/PawnLedger'
+import Invoices from './pages/Invoices'
+import InvoiceView from './pages/InvoiceView'
+import Books from './pages/Books'
 import PlaceholderPage from './pages/PlaceholderPage'
 
 function ProtectedRoute({ children }) {
@@ -22,12 +25,10 @@ export default function App() {
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-      <Route path="/pawn-ledger" element={
-        <ProtectedRoute><PawnLedger /></ProtectedRoute>
-      } />
-      <Route path="/invoices" element={
-        <ProtectedRoute><PlaceholderPage title="GST Invoices" tamil="விலைப்பட்டியல்" phase="Phase 3" /></ProtectedRoute>
-      } />
+      <Route path="/pawn-ledger" element={<ProtectedRoute><PawnLedger /></ProtectedRoute>} />
+      <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
+      <Route path="/invoices/:id" element={<ProtectedRoute><InvoiceView /></ProtectedRoute>} />
+      <Route path="/books" element={<ProtectedRoute><Books /></ProtectedRoute>} />
       <Route path="/bank-loans" element={
         <ProtectedRoute><PlaceholderPage title="Bank Loans" tamil="வங்கி கடன்" phase="Phase 4" /></ProtectedRoute>
       } />

@@ -28,7 +28,6 @@ export default function Dashboard() {
   }, [])
 
   const phaseCards = [
-    { title: 'GST Invoices', tamil: 'விலைப்பட்டியல்', phase: 'Phase 3', desc: 'GST-compliant invoicing + books', to: '/invoices' },
     { title: 'Bank Loans', tamil: 'வங்கி கடன்', phase: 'Phase 4', desc: 'Multi-bank interest due tracking', to: '/bank-loans' },
     { title: 'Rate Sharing', tamil: 'விலை பகிர்வு', phase: 'Phase 5', desc: 'Daily gold/silver rate + share', to: '/rates' },
   ]
