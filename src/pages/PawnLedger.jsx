@@ -25,6 +25,8 @@ export default function PawnLedger() {
   const [filter, setFilter] = useState('active')
   const [search, setSearch] = useState('')
   const [redeemTarget, setRedeemTarget] = useState(null)
+  const [repledgeTarget, setRepledgeTarget] = useState(null)
+  const [repledgeForm, setRepledgeForm] = useState(null)
 
   const load = async () => {
     setLoading(true)
@@ -86,8 +88,55 @@ export default function PawnLedger() {
     load()
   }
 
+  const openRepledge = (pledge) => {
+    setRepledgeTarget(pledge)
+    setRepledgeForm(pledge.is_repledged ? {
+      repledge_party_type: pledge.repledge_party_type || 'bank',
+      repledge_party_name: pledge.repledge_party_name || '',
+      repledge_amount: pledge.repledge_amount || '',
+      repledge_interest_rate: pledge.repledge_interest_rate || '',
+      repledge_rate_unit: pledge.repledge_rate_unit || 'monthly',
+      repledge_date: pledge.repledge_date || new Date().toISOString().slice(0, 10),
+      repledge_notes: pledge.repledge_notes || '',
+    } : {
+      repledge_party_type: 'bank',
+      repledge_party_name: '',
+      repledge_amount: pledge.loan_amount || '',
+      repledge_interest_rate: '',
+      repledge_rate_unit: 'monthly',
+      repledge_date: new Date().toISOString().slice(0, 10),
+      repledge_notes: '',
+    })
+  }
+
+  const handleSaveRepledge = async (e) => {
+    e.preventDefault()
+    await supabase.from('pledges').update({
+      is_repledged: true,
+      repledge_party_type: repledgeForm.repledge_party_type,
+      repledge_party_name: repledgeForm.repledge_party_name,
+      repledge_amount: parseFloat(repledgeForm.repledge_amount) || null,
+      repledge_interest_rate: parseFloat(repledgeForm.repledge_interest_rate) || null,
+      repledge_rate_unit: repledgeForm.repledge_rate_unit,
+      repledge_date: repledgeForm.repledge_date,
+      repledge_notes: repledgeForm.repledge_notes,
+      repledge_returned_date: null,
+    }).eq('id', repledgeTarget.id)
+    setRepledgeTarget(null)
+    load()
+  }
+
+  const handleMarkReturned = async (pledge) => {
+    if (!confirm('Mark this item as returned from the bank/person (re-pledge closed)?')) return
+    await supabase.from('pledges').update({
+      is_repledged: false,
+      repledge_returned_date: new Date().toISOString().slice(0, 10),
+    }).eq('id', pledge.id)
+    load()
+  }
+
   const filtered = pledges.filter((p) => {
-    const matchesFilter = filter === 'all' || p.status === filter
+    const matchesFilter = filter === 'all' || (filter === 'repledged' ? p.is_repledged : p.status === filter)
     const matchesSearch =
       p.item_description?.toLowerCase().includes(search.toLowerCase()) ||
       p.customers?.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -116,7 +165,7 @@ export default function PawnLedger() {
           className="px-3 py-2 rounded border border-charcoal/20 bg-white flex-1 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-gold"
         />
         <div className="flex gap-1 bg-white rounded p-1 border border-charcoal/10">
-          {['active', 'redeemed', 'auctioned', 'all'].map((s) => (
+          {['active', 'redeemed', 'auctioned', 'repledged', 'all'].map((s) => (
             <button
               key={s}
               onClick={() => setFilter(s)}
@@ -154,13 +203,20 @@ export default function PawnLedger() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-medium text-charcoal truncate">{p.item_description}</p>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap capitalize ${
-                        p.status === 'active' ? (overdue ? 'bg-red-100 text-red-700' : 'bg-emerald/10 text-emerald')
-                        : p.status === 'redeemed' ? 'bg-charcoal/10 text-charcoal/60'
-                        : 'bg-gold/10 text-gold-dark'
-                      }`}>
-                        {overdue ? 'Overdue' : p.status}
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap capitalize ${
+                          p.status === 'active' ? (overdue ? 'bg-red-100 text-red-700' : 'bg-emerald/10 text-emerald')
+                          : p.status === 'redeemed' ? 'bg-charcoal/10 text-charcoal/60'
+                          : 'bg-gold/10 text-gold-dark'
+                        }`}>
+                          {overdue ? 'Overdue' : p.status}
+                        </span>
+                        {p.is_repledged && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap bg-blue-100 text-blue-700">
+                            Re-pledged
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <p className="text-sm text-charcoal/60">{p.customers?.name} · {p.customers?.phone}</p>
                     <p className="text-xs text-charcoal/40 mt-1">
@@ -186,13 +242,46 @@ export default function PawnLedger() {
                   </div>
                 </div>
 
+                {p.is_repledged && (
+                  <div className="mt-2 pt-2 border-t border-dashed border-charcoal/10 text-xs text-charcoal/60">
+                    <p>
+                      Re-pledged to <span className="font-medium">{p.repledge_party_name}</span> ({p.repledge_party_type})
+                      {p.repledge_amount ? ` for ₹${Number(p.repledge_amount).toLocaleString('en-IN')}` : ''}
+                      {p.repledge_interest_rate ? ` @ ${p.repledge_interest_rate}%/${p.repledge_rate_unit === 'annual' ? 'yr' : 'mo'}` : ''}
+                    </p>
+                    {p.repledge_interest_rate && (
+                      <p className="text-emerald mt-0.5">
+                        Margin ≈ {(
+                          p.interest_rate - (p.repledge_rate_unit === 'annual' ? p.repledge_interest_rate / 12 : p.repledge_interest_rate)
+                        ).toFixed(2)}%/mo you keep
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {p.status === 'active' && (
-                  <button
-                    onClick={() => setRedeemTarget({ ...p, computedTotal: total })}
-                    className="mt-3 w-full text-sm bg-emerald/10 text-emerald py-1.5 rounded font-medium hover:bg-emerald/20"
-                  >
-                    Mark Redeemed
-                  </button>
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => setRedeemTarget({ ...p, computedTotal: total })}
+                      className="flex-1 text-sm bg-emerald/10 text-emerald py-1.5 rounded font-medium hover:bg-emerald/20"
+                    >
+                      Mark Redeemed
+                    </button>
+                    <button
+                      onClick={() => openRepledge(p)}
+                      className="flex-1 text-sm bg-blue-50 text-blue-700 py-1.5 rounded font-medium hover:bg-blue-100"
+                    >
+                      {p.is_repledged ? 'Edit Re-pledge' : 'Re-pledge'}
+                    </button>
+                    {p.is_repledged && (
+                      <button
+                        onClick={() => handleMarkReturned(p)}
+                        className="text-sm bg-charcoal/10 text-charcoal/60 px-3 rounded font-medium hover:bg-charcoal/20"
+                      >
+                        Returned
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )
@@ -299,6 +388,57 @@ export default function PawnLedger() {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Re-pledge Modal */}
+      {repledgeTarget && repledgeForm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="bg-cream rounded-lg shadow-2xl w-full max-w-sm p-6">
+            <h2 className="font-display text-lg text-maroon-dark mb-1">Re-pledge Item</h2>
+            <p className="text-sm text-charcoal/60 mb-4">{repledgeTarget.item_description}</p>
+            <form onSubmit={handleSaveRepledge} className="space-y-3">
+              <select value={repledgeForm.repledge_party_type}
+                onChange={(e) => setRepledgeForm({ ...repledgeForm, repledge_party_type: e.target.value })}
+                className="w-full px-3 py-2 rounded border border-charcoal/20 bg-white">
+                <option value="bank">Bank</option>
+                <option value="person">Person</option>
+              </select>
+              <input required placeholder="Bank / Person name" value={repledgeForm.repledge_party_name}
+                onChange={(e) => setRepledgeForm({ ...repledgeForm, repledge_party_name: e.target.value })}
+                className="w-full px-3 py-2 rounded border border-charcoal/20 bg-white" />
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" placeholder="Amount (₹)" value={repledgeForm.repledge_amount}
+                  onChange={(e) => setRepledgeForm({ ...repledgeForm, repledge_amount: e.target.value })}
+                  className="px-3 py-2 rounded border border-charcoal/20 bg-white" />
+                <input type="date" value={repledgeForm.repledge_date}
+                  onChange={(e) => setRepledgeForm({ ...repledgeForm, repledge_date: e.target.value })}
+                  className="px-3 py-2 rounded border border-charcoal/20 bg-white" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" step="0.01" placeholder="Interest rate" value={repledgeForm.repledge_interest_rate}
+                  onChange={(e) => setRepledgeForm({ ...repledgeForm, repledge_interest_rate: e.target.value })}
+                  className="px-3 py-2 rounded border border-charcoal/20 bg-white" />
+                <select value={repledgeForm.repledge_rate_unit}
+                  onChange={(e) => setRepledgeForm({ ...repledgeForm, repledge_rate_unit: e.target.value })}
+                  className="px-3 py-2 rounded border border-charcoal/20 bg-white">
+                  <option value="monthly">% / month</option>
+                  <option value="annual">% / year</option>
+                </select>
+              </div>
+              <textarea placeholder="Notes" value={repledgeForm.repledge_notes}
+                onChange={(e) => setRepledgeForm({ ...repledgeForm, repledge_notes: e.target.value })}
+                rows={2} className="w-full px-3 py-2 rounded border border-charcoal/20 bg-white" />
+              <div className="flex gap-2 pt-2">
+                <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded font-medium hover:opacity-90">
+                  Save Re-pledge
+                </button>
+                <button type="button" onClick={() => setRepledgeTarget(null)}
+                  className="flex-1 bg-charcoal/10 text-charcoal py-2 rounded font-medium hover:bg-charcoal/20">
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
