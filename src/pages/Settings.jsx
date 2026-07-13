@@ -1,14 +1,25 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
+const CATEGORIES = ['necklace', 'ring', 'bangle', 'earring', 'other']
+
 export default function Settings() {
   const [form, setForm] = useState(null)
   const [saved, setSaved] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [gallery, setGallery] = useState([])
+  const [uploadingGallery, setUploadingGallery] = useState(false)
+  const [newCategory, setNewCategory] = useState('necklace')
+
+  const loadGallery = async () => {
+    const { data } = await supabase.from('jewellery_gallery').select('*').order('created_at', { ascending: false })
+    setGallery(data || [])
+  }
 
   useEffect(() => {
     supabase.from('business_settings').select('*').eq('id', 1).single()
       .then(({ data }) => setForm(data))
+    loadGallery()
   }, [])
 
   const handleLogoUpload = async (e) => {
@@ -28,6 +39,31 @@ export default function Settings() {
     setForm(newForm)
     await supabase.from('business_settings').update({ logo_url: data.publicUrl }).eq('id', 1)
     setUploadingLogo(false)
+  }
+
+  const handleGalleryUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploadingGallery(true)
+    const ext = file.name.split('.').pop()
+    const path = `jewellery/${Date.now()}.${ext}`
+    const { error: uploadErr } = await supabase.storage.from('business-assets').upload(path, file)
+    if (uploadErr) {
+      alert('Photo upload failed: ' + uploadErr.message)
+      setUploadingGallery(false)
+      return
+    }
+    const { data } = supabase.storage.from('business-assets').getPublicUrl(path)
+    await supabase.from('jewellery_gallery').insert([{ image_url: data.publicUrl, category: newCategory }])
+    setUploadingGallery(false)
+    e.target.value = ''
+    loadGallery()
+  }
+
+  const handleDeletePhoto = async (item) => {
+    if (!confirm('Delete this photo?')) return
+    await supabase.from('jewellery_gallery').delete().eq('id', item.id)
+    loadGallery()
   }
 
   const handleSubmit = async (e) => {
@@ -60,6 +96,43 @@ export default function Settings() {
             <p className="text-xs text-charcoal/40 mt-1">Used on the rate card image shared to customers.</p>
           </div>
         </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm p-6 mb-4">
+        <label className="block text-sm font-medium mb-2">Jewellery Photos</label>
+        <p className="text-xs text-charcoal/40 mb-3">
+          Upload real photos of your jewellery (necklace, ring, bangle, earring). These appear on the rate card image you share — much more attractive than generic icons, and it's your own stock.
+        </p>
+
+        <div className="flex items-center gap-2 mb-4">
+          <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)}
+            className="px-3 py-2 rounded border border-charcoal/20 text-sm capitalize">
+            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <input type="file" accept="image/*" onChange={handleGalleryUpload} className="text-sm flex-1" />
+        </div>
+        {uploadingGallery && <p className="text-xs text-charcoal/40 mb-3">Uploading...</p>}
+
+        {gallery.length === 0 ? (
+          <p className="text-xs text-charcoal/40 border border-dashed border-charcoal/20 rounded p-4 text-center">
+            No photos yet. Add your first jewellery photo above.
+          </p>
+        ) : (
+          <div className="grid grid-cols-4 gap-2">
+            {gallery.map((g) => (
+              <div key={g.id} className="relative group">
+                <img src={g.image_url} alt={g.category} className="w-full aspect-square object-cover rounded border border-charcoal/10" />
+                <p className="text-[10px] text-charcoal/40 capitalize text-center mt-0.5">{g.category}</p>
+                <button
+                  onClick={() => handleDeletePhoto(g)}
+                  className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6 space-y-4">

@@ -85,6 +85,44 @@ function drawGemDivider(ctx, x1, x2, y, color) {
   drawGem(ctx, (x1 + x2) / 2, y, 10, color)
 }
 
+function drawFramedPhoto(ctx, img, cx, cy, size) {
+  const r = size / 2
+  // soft shadow
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.35)'
+  ctx.shadowBlur = 24
+  ctx.shadowOffsetY = 8
+  ctx.beginPath()
+  ctx.arc(cx, cy, r, 0, Math.PI * 2)
+  ctx.fillStyle = '#000'
+  ctx.fill()
+  ctx.restore()
+
+  // clipped photo, cover-fit into circle
+  ctx.save()
+  ctx.beginPath()
+  ctx.arc(cx, cy, r, 0, Math.PI * 2)
+  ctx.closePath()
+  ctx.clip()
+  const scale = Math.max(size / img.width, size / img.height)
+  const dw = img.width * scale
+  const dh = img.height * scale
+  ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh)
+  ctx.restore()
+
+  // double gold ring frame
+  ctx.strokeStyle = JEWEL_GOLD
+  ctx.lineWidth = 8
+  ctx.beginPath()
+  ctx.arc(cx, cy, r, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.strokeStyle = JEWEL_GOLD_LIGHT
+  ctx.lineWidth = 2.5
+  ctx.beginPath()
+  ctx.arc(cx, cy, r - 12, 0, Math.PI * 2)
+  ctx.stroke()
+}
+
 // ---- Original vector jewellery motifs (illustrated line art, not photos) ----
 // Always rendered in gold tones, independent of the card's color theme.
 
@@ -182,7 +220,7 @@ export const JEWELLERY_MOTIFS = {
   earring: drawEarringMotif,
 }
 
-export async function drawRateCard(ctx, data, theme, motifKey = 'none') {
+export async function drawRateCard(ctx, data, theme, motifKey = 'none', photoUrl = null) {
   ctx.clearRect(0, 0, W, H)
 
   // Background gradient
@@ -253,7 +291,11 @@ export async function drawRateCard(ctx, data, theme, motifKey = 'none') {
   y += 60
 
   const motifFn = JEWELLERY_MOTIFS[motifKey]
-  if (motifFn) {
+  const photoImg = await loadImage(photoUrl)
+  if (photoImg) {
+    drawFramedPhoto(ctx, photoImg, W / 2, y + 130, 320)
+    y += 290
+  } else if (motifFn) {
     motifFn(ctx, W / 2, y + 90, 2.0)
     y += 210
   } else {

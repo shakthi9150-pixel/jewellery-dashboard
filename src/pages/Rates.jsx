@@ -25,19 +25,24 @@ export default function Rates() {
   const [copied, setCopied] = useState(false)
   const [themeId, setThemeId] = useState(RATE_CARD_THEMES[0].id)
   const [motifKey, setMotifKey] = useState('necklace')
+  const [gallery, setGallery] = useState([])
+  const [selectedPhotoId, setSelectedPhotoId] = useState(null)
   const [imageReady, setImageReady] = useState(false)
   const canvasRef = useRef(null)
 
   const load = async () => {
     setLoading(true)
-    const [{ data: rateData }, { data: custData }, { data: settings }] = await Promise.all([
+    const [{ data: rateData }, { data: custData }, { data: settings }, { data: galleryData }] = await Promise.all([
       supabase.from('metal_rates').select('*').order('rate_date', { ascending: false }).limit(30),
       supabase.from('customers').select('id, name, phone').order('name'),
       supabase.from('business_settings').select('*').eq('id', 1).single(),
+      supabase.from('jewellery_gallery').select('*').order('created_at', { ascending: false }),
     ])
     setRates(rateData || [])
     setCustomers(custData || [])
     setBusiness(settings || null)
+    setGallery(galleryData || [])
+    if (galleryData?.length && !selectedPhotoId) setSelectedPhotoId(galleryData[0].id)
 
     const todayRate = (rateData || []).find((r) => r.rate_date === today())
     if (todayRate) {
@@ -78,8 +83,9 @@ export default function Rates() {
       silver: form.silver_rate,
     }
     const theme = RATE_CARD_THEMES.find((t) => t.id === themeId) || RATE_CARD_THEMES[0]
-    drawRateCard(ctx, data, theme, motifKey).then(() => setImageReady(true))
-  }, [business, themeId, motifKey, form.rate_date, form.gold_22k_rate, form.gold_24k_rate, form.silver_rate])
+    const selectedPhoto = gallery.find((g) => g.id === selectedPhotoId)
+    drawRateCard(ctx, data, theme, motifKey, selectedPhoto?.image_url || null).then(() => setImageReady(true))
+  }, [business, themeId, motifKey, selectedPhotoId, gallery, form.rate_date, form.gold_22k_rate, form.gold_24k_rate, form.silver_rate])
 
   const handleSave = async (e) => {
     e.preventDefault()
@@ -248,20 +254,51 @@ export default function Rates() {
           ))}
         </div>
 
-        <p className="text-xs text-charcoal/50 mb-2">Jewellery motif (decorative illustration on the card):</p>
-        <div className="flex gap-2 flex-wrap mb-5">
-          {MOTIF_OPTIONS.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => setMotifKey(m.id)}
-              className={`px-3 py-1.5 rounded text-sm transition-colors border ${
-                motifKey === m.id ? 'bg-maroon text-cream border-maroon' : 'bg-cream text-charcoal/60 border-charcoal/10 hover:bg-white'
-              }`}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
+        {gallery.length > 0 && (
+          <>
+            <p className="text-xs text-charcoal/50 mb-2">Your jewellery photos (used on the card):</p>
+            <div className="flex gap-2 flex-wrap mb-3">
+              {gallery.map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => setSelectedPhotoId(g.id)}
+                  className={`w-16 h-16 rounded-full overflow-hidden border-2 transition-transform hover:scale-105 ${
+                    selectedPhotoId === g.id ? 'border-maroon scale-105' : 'border-transparent'
+                  }`}
+                >
+                  <img src={g.image_url} alt={g.category} className="w-full h-full object-cover" />
+                </button>
+              ))}
+              <button
+                onClick={() => setSelectedPhotoId(null)}
+                className={`w-16 h-16 rounded-full border-2 border-dashed flex items-center justify-center text-[10px] text-charcoal/50 ${
+                  !selectedPhotoId ? 'border-maroon' : 'border-charcoal/20'
+                }`}
+              >
+                Use icon
+              </button>
+            </div>
+          </>
+        )}
+
+        {!selectedPhotoId && (
+          <>
+            <p className="text-xs text-charcoal/50 mb-2">Jewellery motif (decorative illustration on the card):</p>
+            <div className="flex gap-2 flex-wrap mb-5">
+              {MOTIF_OPTIONS.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setMotifKey(m.id)}
+                  className={`px-3 py-1.5 rounded text-sm transition-colors border ${
+                    motifKey === m.id ? 'bg-maroon text-cream border-maroon' : 'bg-cream text-charcoal/60 border-charcoal/10 hover:bg-white'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="flex flex-col items-center">
           <div className="w-full max-w-xs rounded-lg overflow-hidden shadow-md border border-charcoal/10">
@@ -278,9 +315,9 @@ export default function Rates() {
               Download
             </button>
           </div>
-          {!business?.logo_url && (
+          {!business?.logo_url && gallery.length === 0 && (
             <p className="text-xs text-charcoal/40 mt-3 text-center">
-              Tip: add a business logo in Settings for a more branded card.
+              Tip: add a business logo and jewellery photos in Settings for a more attractive, branded card.
             </p>
           )}
         </div>
