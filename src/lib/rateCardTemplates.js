@@ -80,7 +80,94 @@ function drawGemDivider(ctx, x1, x2, y, color) {
   drawGem(ctx, (x1 + x2) / 2, y, 10, color)
 }
 
-export async function drawRateCard(ctx, data, theme) {
+// ---- Original vector jewellery motifs (illustrated line art, not photos) ----
+
+function drawNecklaceMotif(ctx, cx, cy, scale, color) {
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.scale(scale, scale)
+  ctx.strokeStyle = color
+  ctx.lineWidth = 3
+  // chain curve
+  ctx.beginPath()
+  ctx.moveTo(-70, -20)
+  ctx.quadraticCurveTo(0, 55, 70, -20)
+  ctx.stroke()
+  // small chain links
+  const linkCount = 11
+  for (let i = 0; i <= linkCount; i++) {
+    const t = i / linkCount
+    const x = -70 + t * 140
+    const yy = -20 + Math.sin(t * Math.PI) * 75
+    ctx.beginPath()
+    ctx.arc(x, yy, 2.2, 0, Math.PI * 2)
+    ctx.fillStyle = color
+    ctx.fill()
+  }
+  // pendant
+  drawGem(ctx, 0, 60, 22, color)
+  ctx.restore()
+}
+
+function drawRingMotif(ctx, cx, cy, scale, color) {
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.scale(scale, scale)
+  ctx.strokeStyle = color
+  ctx.lineWidth = 8
+  ctx.beginPath()
+  ctx.arc(0, 20, 38, 0.35 * Math.PI, 1.65 * Math.PI)
+  ctx.stroke()
+  drawGem(ctx, 0, -20, 20, color)
+  ctx.restore()
+}
+
+function drawBangleMotif(ctx, cx, cy, scale, color) {
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.scale(scale, scale)
+  ctx.strokeStyle = color
+  ctx.lineWidth = 10
+  ctx.beginPath()
+  ctx.ellipse(0, 0, 55, 45, 0, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.lineWidth = 2
+  ctx.globalAlpha = 0.6
+  ctx.beginPath()
+  ctx.ellipse(0, 0, 55, 45, 0, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.restore()
+}
+
+function drawEarringMotif(ctx, cx, cy, scale, color) {
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.scale(scale, scale)
+  ctx.strokeStyle = color
+  ctx.lineWidth = 2.5
+  // hook
+  ctx.beginPath()
+  ctx.arc(0, -35, 10, 0.2 * Math.PI, 1.8 * Math.PI)
+  ctx.stroke()
+  // chain link
+  ctx.beginPath()
+  ctx.moveTo(0, -25)
+  ctx.lineTo(0, -5)
+  ctx.stroke()
+  // drop gem
+  drawGem(ctx, 0, 20, 22, color)
+  ctx.restore()
+}
+
+export const JEWELLERY_MOTIFS = {
+  none: null,
+  necklace: drawNecklaceMotif,
+  ring: drawRingMotif,
+  bangle: drawBangleMotif,
+  earring: drawEarringMotif,
+}
+
+export async function drawRateCard(ctx, data, theme, motifKey = 'none') {
   ctx.clearRect(0, 0, W, H)
 
   // Background gradient
@@ -148,7 +235,15 @@ export async function drawRateCard(ctx, data, theme) {
   ctx.font = '20px Arial'
   ctx.fillStyle = theme.textSecondary
   ctx.fillText(`as on ${data.date}`, W / 2, y)
-  y += 50
+  y += 60
+
+  const motifFn = JEWELLERY_MOTIFS[motifKey]
+  if (motifFn) {
+    motifFn(ctx, W / 2, y, 1.0, theme.accent)
+    y += 95
+  } else {
+    y -= 10
+  }
 
   drawGemDivider(ctx, 130, W - 130, y, theme.border)
   y += 70

@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { drawRateCard, CANVAS_WIDTH, CANVAS_HEIGHT } from '../lib/rateCardTemplates'
+import { drawRateCard, CANVAS_WIDTH, CANVAS_HEIGHT, JEWELLERY_MOTIFS } from '../lib/rateCardTemplates'
 import { RATE_CARD_THEMES } from '../lib/rateCardThemes'
+
+const MOTIF_OPTIONS = [
+  { id: 'none', label: 'None' },
+  { id: 'necklace', label: 'Necklace' },
+  { id: 'ring', label: 'Ring' },
+  { id: 'bangle', label: 'Bangle' },
+  { id: 'earring', label: 'Earring' },
+]
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -16,6 +24,7 @@ export default function Rates() {
   const [manualPhone, setManualPhone] = useState('')
   const [copied, setCopied] = useState(false)
   const [themeId, setThemeId] = useState(RATE_CARD_THEMES[0].id)
+  const [motifKey, setMotifKey] = useState('necklace')
   const [imageReady, setImageReady] = useState(false)
   const canvasRef = useRef(null)
 
@@ -69,8 +78,8 @@ export default function Rates() {
       silver: form.silver_rate,
     }
     const theme = RATE_CARD_THEMES.find((t) => t.id === themeId) || RATE_CARD_THEMES[0]
-    drawRateCard(ctx, data, theme).then(() => setImageReady(true))
-  }, [business, themeId, form.rate_date, form.gold_22k_rate, form.gold_24k_rate, form.silver_rate])
+    drawRateCard(ctx, data, theme, motifKey).then(() => setImageReady(true))
+  }, [business, themeId, motifKey, form.rate_date, form.gold_22k_rate, form.gold_24k_rate, form.silver_rate])
 
   const handleSave = async (e) => {
     e.preventDefault()
@@ -236,6 +245,21 @@ export default function Rates() {
               }`}
               style={{ background: `linear-gradient(135deg, ${t.bg[0]}, ${t.bg[1]})` }}
             />
+          ))}
+        </div>
+
+        <p className="text-xs text-charcoal/50 mb-2">Jewellery motif (decorative illustration on the card):</p>
+        <div className="flex gap-2 flex-wrap mb-5">
+          {MOTIF_OPTIONS.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => setMotifKey(m.id)}
+              className={`px-3 py-1.5 rounded text-sm transition-colors border ${
+                motifKey === m.id ? 'bg-maroon text-cream border-maroon' : 'bg-cream text-charcoal/60 border-charcoal/10 hover:bg-white'
+              }`}
+            >
+              {m.label}
+            </button>
           ))}
         </div>
 
