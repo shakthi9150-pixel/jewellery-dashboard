@@ -2,7 +2,12 @@
 // data = { businessName, address, phone, date, gold22k, gold24k, silver, logoUrl }
 
 const W = 1080
-const H = 1350
+const H = 1180
+
+// Jewellery motifs are always rendered in gold, regardless of card theme —
+// this is what makes them read as "jewellery" rather than an abstract icon.
+const JEWEL_GOLD = '#D4AF37'
+const JEWEL_GOLD_LIGHT = '#F6DA8E'
 
 function loadImage(url) {
   return new Promise((resolve) => {
@@ -81,81 +86,91 @@ function drawGemDivider(ctx, x1, x2, y, color) {
 }
 
 // ---- Original vector jewellery motifs (illustrated line art, not photos) ----
+// Always rendered in gold tones, independent of the card's color theme.
 
-function drawNecklaceMotif(ctx, cx, cy, scale, color) {
+function drawNecklaceMotif(ctx, cx, cy, scale) {
   ctx.save()
   ctx.translate(cx, cy)
   ctx.scale(scale, scale)
-  ctx.strokeStyle = color
-  ctx.lineWidth = 3
+  ctx.strokeStyle = JEWEL_GOLD
+  ctx.lineWidth = 3.5
   // chain curve
   ctx.beginPath()
   ctx.moveTo(-70, -20)
   ctx.quadraticCurveTo(0, 55, 70, -20)
   ctx.stroke()
   // small chain links
-  const linkCount = 11
+  const linkCount = 13
   for (let i = 0; i <= linkCount; i++) {
     const t = i / linkCount
     const x = -70 + t * 140
     const yy = -20 + Math.sin(t * Math.PI) * 75
     ctx.beginPath()
-    ctx.arc(x, yy, 2.2, 0, Math.PI * 2)
-    ctx.fillStyle = color
+    ctx.arc(x, yy, 2.6, 0, Math.PI * 2)
+    ctx.fillStyle = JEWEL_GOLD_LIGHT
     ctx.fill()
   }
-  // pendant
-  drawGem(ctx, 0, 60, 22, color)
+  // pendant — a larger gem with a highlight facet for shine
+  drawGem(ctx, 0, 62, 30, JEWEL_GOLD)
+  drawGem(ctx, 0, 62, 14, JEWEL_GOLD_LIGHT)
   ctx.restore()
 }
 
-function drawRingMotif(ctx, cx, cy, scale, color) {
+function drawRingMotif(ctx, cx, cy, scale) {
   ctx.save()
   ctx.translate(cx, cy)
   ctx.scale(scale, scale)
-  ctx.strokeStyle = color
-  ctx.lineWidth = 8
-  ctx.beginPath()
-  ctx.arc(0, 20, 38, 0.35 * Math.PI, 1.65 * Math.PI)
-  ctx.stroke()
-  drawGem(ctx, 0, -20, 20, color)
-  ctx.restore()
-}
-
-function drawBangleMotif(ctx, cx, cy, scale, color) {
-  ctx.save()
-  ctx.translate(cx, cy)
-  ctx.scale(scale, scale)
-  ctx.strokeStyle = color
+  ctx.strokeStyle = JEWEL_GOLD
   ctx.lineWidth = 10
   ctx.beginPath()
-  ctx.ellipse(0, 0, 55, 45, 0, 0, Math.PI * 2)
+  ctx.arc(0, 25, 46, 0.32 * Math.PI, 1.68 * Math.PI)
   ctx.stroke()
-  ctx.lineWidth = 2
-  ctx.globalAlpha = 0.6
+  ctx.strokeStyle = JEWEL_GOLD_LIGHT
+  ctx.lineWidth = 3
   ctx.beginPath()
-  ctx.ellipse(0, 0, 55, 45, 0, 0, Math.PI * 2)
+  ctx.arc(0, 25, 46, 0.32 * Math.PI, 1.68 * Math.PI)
+  ctx.stroke()
+  drawGem(ctx, 0, -22, 26, JEWEL_GOLD)
+  drawGem(ctx, 0, -22, 12, JEWEL_GOLD_LIGHT)
+  ctx.restore()
+}
+
+function drawBangleMotif(ctx, cx, cy, scale) {
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.scale(scale, scale)
+  ctx.strokeStyle = JEWEL_GOLD
+  ctx.lineWidth = 13
+  ctx.beginPath()
+  ctx.ellipse(0, 0, 68, 55, 0, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.strokeStyle = JEWEL_GOLD_LIGHT
+  ctx.lineWidth = 3
+  ctx.globalAlpha = 0.8
+  ctx.beginPath()
+  ctx.ellipse(0, 0, 68, 55, 0, 0, Math.PI * 2)
   ctx.stroke()
   ctx.restore()
 }
 
-function drawEarringMotif(ctx, cx, cy, scale, color) {
+function drawEarringMotif(ctx, cx, cy, scale) {
   ctx.save()
   ctx.translate(cx, cy)
   ctx.scale(scale, scale)
-  ctx.strokeStyle = color
-  ctx.lineWidth = 2.5
+  ctx.strokeStyle = JEWEL_GOLD
+  ctx.lineWidth = 3
   // hook
   ctx.beginPath()
-  ctx.arc(0, -35, 10, 0.2 * Math.PI, 1.8 * Math.PI)
+  ctx.arc(0, -40, 12, 0.2 * Math.PI, 1.8 * Math.PI)
   ctx.stroke()
   // chain link
   ctx.beginPath()
-  ctx.moveTo(0, -25)
-  ctx.lineTo(0, -5)
+  ctx.moveTo(0, -28)
+  ctx.lineTo(0, -4)
   ctx.stroke()
   // drop gem
-  drawGem(ctx, 0, 20, 22, color)
+  drawGem(ctx, 0, 26, 28, JEWEL_GOLD)
+  drawGem(ctx, 0, 26, 13, JEWEL_GOLD_LIGHT)
   ctx.restore()
 }
 
@@ -239,10 +254,10 @@ export async function drawRateCard(ctx, data, theme, motifKey = 'none') {
 
   const motifFn = JEWELLERY_MOTIFS[motifKey]
   if (motifFn) {
-    motifFn(ctx, W / 2, y, 1.0, theme.accent)
-    y += 95
+    motifFn(ctx, W / 2, y + 90, 2.0)
+    y += 210
   } else {
-    y -= 10
+    y += 20
   }
 
   drawGemDivider(ctx, 130, W - 130, y, theme.border)
@@ -293,8 +308,8 @@ export async function drawRateCard(ctx, data, theme, motifKey = 'none') {
     y += 10
   }
 
-  // Footer
-  let fy = H - 130
+  // Footer — follows content directly (capped so it doesn't sit too high on short cards)
+  let fy = Math.max(y + 75, H - 170)
   drawGemDivider(ctx, 130, W - 130, fy - 45, theme.border)
   ctx.textAlign = 'center'
   ctx.font = '22px Arial'
