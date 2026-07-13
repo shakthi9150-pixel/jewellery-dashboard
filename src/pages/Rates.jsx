@@ -1,28 +1,33 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { drawDarkTemplate, drawMaroonTemplate, CANVAS_WIDTH, CANVAS_HEIGHT } from '../lib/rateCardTemplates'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
 export default function Rates() {
   const [rates, setRates] = useState([])
   const [customers, setCustomers] = useState([])
-  const [businessName, setBusinessName] = useState('')
+  const [business, setBusiness] = useState(null)
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({ rate_date: today(), gold_22k_rate: '', gold_24k_rate: '', silver_rate: '', notes: '' })
   const [saving, setSaving] = useState(false)
   const [shareCustomerId, setShareCustomerId] = useState('')
   const [manualPhone, setManualPhone] = useState('')
+  const [copied, setCopied] = useState(false)
+  const [template, setTemplate] = useState('dark')
+  const [imageReady, setImageReady] = useState(false)
+  const canvasRef = useRef(null)
 
   const load = async () => {
     setLoading(true)
     const [{ data: rateData }, { data: custData }, { data: settings }] = await Promise.all([
       supabase.from('metal_rates').select('*').order('rate_date', { ascending: false }).limit(30),
       supabase.from('customers').select('id, name, phone').order('name'),
-      supabase.from('business_settings').select('business_name').eq('id', 1).single(),
+      supabase.from('business_settings').select('*').eq('id', 1).single(),
     ])
     setRates(rateData || [])
     setCustomers(custData || [])
-    setBusinessName(settings?.business_name || '')
+    setBusiness(settings || null)
 
     const todayRate = (rateData || []).find((r) => r.rate_date === today())
     if (todayRate) {
@@ -34,7 +39,6 @@ export default function Rates() {
         notes: todayRate.notes ?? '',
       })
     } else if (rateData?.[0]) {
-      // prefill with last known rate for easy quick-update
       setForm((f) => ({
         ...f,
         gold_22k_rate: rateData[0].gold_22k_rate ?? '',
@@ -46,6 +50,26 @@ export default function Rates() {
   }
 
   useEffect(() => { load() }, [])
+
+  // Redraw the rate card whenever the relevant data or template changes
+  useEffect(() => {
+    if (!business || !canvasRef.current) return
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    setImageReady(false)
+    const data = {
+      businessName: business.business_name,
+      address: business.address,
+      phone: business.phone,
+      logoUrl: business.logo_url,
+      date: form.rate_date,
+      gold22k: form.gold_22k_rate,
+      gold24k: form.gold_24k_rate,
+      silver: form.silver_rate,
+    }
+    const draw = template === 'dark' ? drawDarkTemplate : drawMaroonTemplate
+    draw(ctx, data).then(() => setImageReady(true))
+  }, [business, template, form.rate_date, form.gold_22k_rate, form.gold_24k_rate, form.silver_rate])
 
   const handleSave = async (e) => {
     e.preventDefault()
@@ -62,11 +86,7 @@ export default function Rates() {
   }
 
   const buildMessage = () => {
-    const lines = [
-      `*${businessName}*`,
-      `Rate as on ${form.rate_date}`,
-      '',
-    ]
+    const lines = [`*${business?.business_name || ''}*`, `Rate as on ${form.rate_date}`, '']
     if (form.gold_22k_rate) lines.push(`22K Gold: ₹${Number(form.gold_22k_rate).toLocaleString('en-IN')}/g`)
     if (form.gold_24k_rate) lines.push(`24K Gold: ₹${Number(form.gold_24k_rate).toLocaleString('en-IN')}/g`)
     if (form.silver_rate) lines.push(`Silver: ₹${Number(form.silver_rate).toLocaleString('en-IN')}/g`)
@@ -79,17 +99,42 @@ export default function Rates() {
     const rawPhone = customer?.phone || manualPhone
     if (!rawPhone) { alert('Select a customer or enter a phone number'); return }
     let phone = rawPhone.replace(/\D/g, '')
-    if (phone.length === 10) phone = '91' + phone // assume India if no country code
+    if (phone.length === 10) phone = '91' + phone
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(buildMessage())}`
     window.open(url, '_blank')
   }
-
-  const [copied, setCopied] = useState(false)
 
   const copyMessage = async () => {
     await navigator.clipboard.writeText(buildMessage())
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const getCanvasBlob = () => new Promise((resolve) => canvasRef.current.toBlob(resolve, 'image/png'))
+
+  const downloadImage = async () => {
+    const blob = await getCanvasBlob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `rate-card-${form.rate_date}.png`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const shareImage = async () => {
+    const blob = await getCanvasBlob()
+    const file = new File([blob], `rate-card-${form.rate_date}.png`, { type: 'image/png' })
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Today\'s Rate', text: buildMessage() })
+      } catch (err) {
+        if (err.name !== 'AbortError') alert('Share failed: ' + err.message)
+      }
+    } else {
+      alert('Direct image share is not supported on this browser/device. Downloading instead — please attach it manually in WhatsApp.')
+      downloadImage()
+    }
   }
 
   return (
@@ -99,7 +144,7 @@ export default function Rates() {
         <p className="text-sm text-charcoal/50 font-tamil">விலை பகிர்வு</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Rate entry form */}
         <div className="bg-white rounded-lg shadow-sm p-5">
           <h2 className="font-medium text-charcoal mb-3">Today's Rate</h2>
@@ -126,7 +171,7 @@ export default function Rates() {
                 onChange={(e) => setForm({ ...form, silver_rate: e.target.value })}
                 className="w-full px-3 py-2 rounded border border-charcoal/20 bg-cream" />
             </div>
-            <textarea placeholder="Notes (optional, appears in shared message)" value={form.notes}
+            <textarea placeholder="Notes (optional, appears in text message)" value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2}
               className="w-full px-3 py-2 rounded border border-charcoal/20 bg-cream" />
             <button type="submit" disabled={saving}
@@ -136,9 +181,9 @@ export default function Rates() {
           </form>
         </div>
 
-        {/* Share panel */}
+        {/* Text share panel */}
         <div className="bg-white rounded-lg shadow-sm p-5">
-          <h2 className="font-medium text-charcoal mb-3">Share on WhatsApp</h2>
+          <h2 className="font-medium text-charcoal mb-3">Share as Text</h2>
           <div className="bg-cream rounded p-3 text-sm whitespace-pre-line mb-4 border border-charcoal/10 font-mono">
             {buildMessage()}
           </div>
@@ -169,6 +214,45 @@ export default function Rates() {
               {copied ? 'Copied ✓' : 'Copy Rate Message'}
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Rate Card Image */}
+      <div className="bg-white rounded-lg shadow-sm p-5 mb-8">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+          <h2 className="font-medium text-charcoal">Rate Card Image</h2>
+          <div className="flex gap-1 bg-cream rounded p-1 border border-charcoal/10">
+            <button onClick={() => setTemplate('dark')}
+              className={`px-3 py-1.5 rounded text-sm transition-colors ${template === 'dark' ? 'bg-maroon text-cream' : 'text-charcoal/60 hover:bg-white'}`}>
+              Dark & Gold
+            </button>
+            <button onClick={() => setTemplate('maroon')}
+              className={`px-3 py-1.5 rounded text-sm transition-colors ${template === 'maroon' ? 'bg-maroon text-cream' : 'text-charcoal/60 hover:bg-white'}`}>
+              Maroon & Gold
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center">
+          <div className="w-full max-w-xs rounded-lg overflow-hidden shadow-md border border-charcoal/10">
+            <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} className="w-full h-auto block" />
+          </div>
+
+          <div className="flex gap-2 mt-4 w-full max-w-xs">
+            <button onClick={shareImage} disabled={!imageReady}
+              className="flex-1 bg-emerald text-cream py-2 rounded font-medium hover:opacity-90 disabled:opacity-50 text-sm">
+              Share to WhatsApp
+            </button>
+            <button onClick={downloadImage} disabled={!imageReady}
+              className="flex-1 bg-charcoal/10 text-charcoal py-2 rounded font-medium hover:bg-charcoal/20 disabled:opacity-50 text-sm">
+              Download
+            </button>
+          </div>
+          {!business?.logo_url && (
+            <p className="text-xs text-charcoal/40 mt-3 text-center">
+              Tip: add a business logo in Settings for a more branded card.
+            </p>
+          )}
         </div>
       </div>
 
