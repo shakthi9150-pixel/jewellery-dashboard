@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { drawDarkTemplate, drawMaroonTemplate, CANVAS_WIDTH, CANVAS_HEIGHT } from '../lib/rateCardTemplates'
+import { drawRateCard, CANVAS_WIDTH, CANVAS_HEIGHT } from '../lib/rateCardTemplates'
+import { RATE_CARD_THEMES } from '../lib/rateCardThemes'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -14,7 +15,7 @@ export default function Rates() {
   const [shareCustomerId, setShareCustomerId] = useState('')
   const [manualPhone, setManualPhone] = useState('')
   const [copied, setCopied] = useState(false)
-  const [template, setTemplate] = useState('dark')
+  const [themeId, setThemeId] = useState(RATE_CARD_THEMES[0].id)
   const [imageReady, setImageReady] = useState(false)
   const canvasRef = useRef(null)
 
@@ -67,9 +68,9 @@ export default function Rates() {
       gold24k: form.gold_24k_rate,
       silver: form.silver_rate,
     }
-    const draw = template === 'dark' ? drawDarkTemplate : drawMaroonTemplate
-    draw(ctx, data).then(() => setImageReady(true))
-  }, [business, template, form.rate_date, form.gold_22k_rate, form.gold_24k_rate, form.silver_rate])
+    const theme = RATE_CARD_THEMES.find((t) => t.id === themeId) || RATE_CARD_THEMES[0]
+    drawRateCard(ctx, data, theme).then(() => setImageReady(true))
+  }, [business, themeId, form.rate_date, form.gold_22k_rate, form.gold_24k_rate, form.silver_rate])
 
   const handleSave = async (e) => {
     e.preventDefault()
@@ -221,16 +222,21 @@ export default function Rates() {
       <div className="bg-white rounded-lg shadow-sm p-5 mb-8">
         <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
           <h2 className="font-medium text-charcoal">Rate Card Image</h2>
-          <div className="flex gap-1 bg-cream rounded p-1 border border-charcoal/10">
-            <button onClick={() => setTemplate('dark')}
-              className={`px-3 py-1.5 rounded text-sm transition-colors ${template === 'dark' ? 'bg-maroon text-cream' : 'text-charcoal/60 hover:bg-white'}`}>
-              Dark & Gold
-            </button>
-            <button onClick={() => setTemplate('maroon')}
-              className={`px-3 py-1.5 rounded text-sm transition-colors ${template === 'maroon' ? 'bg-maroon text-cream' : 'text-charcoal/60 hover:bg-white'}`}>
-              Maroon & Gold
-            </button>
-          </div>
+          <p className="text-xs text-charcoal/40">{RATE_CARD_THEMES.find((t) => t.id === themeId)?.name}</p>
+        </div>
+
+        <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 mb-5">
+          {RATE_CARD_THEMES.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setThemeId(t.id)}
+              title={t.name}
+              className={`aspect-square rounded-full border-2 transition-transform hover:scale-110 ${
+                themeId === t.id ? 'border-charcoal scale-110' : 'border-transparent'
+              }`}
+              style={{ background: `linear-gradient(135deg, ${t.bg[0]}, ${t.bg[1]})` }}
+            />
+          ))}
         </div>
 
         <div className="flex flex-col items-center">

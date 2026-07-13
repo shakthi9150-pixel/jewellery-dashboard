@@ -1,5 +1,5 @@
-// Draws a shareable rate-card image onto a canvas. Two template styles.
-// data = { businessName, address, phone, date, gold22k, gold24k, silver, logoImg }
+// Draws a shareable rate-card image onto a canvas using a given color theme.
+// data = { businessName, address, phone, date, gold22k, gold24k, silver, logoUrl }
 
 const W = 1080
 const H = 1350
@@ -29,31 +29,89 @@ function drawRoundedRect(ctx, x, y, w, h, r) {
   ctx.closePath()
 }
 
-export async function drawDarkTemplate(ctx, data) {
+// Simple original vector gem/diamond icon (not a photo — an illustrated shape)
+function drawGem(ctx, cx, cy, size, color) {
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.fillStyle = color
+  ctx.beginPath()
+  ctx.moveTo(0, -size)
+  ctx.lineTo(size * 0.7, -size * 0.3)
+  ctx.lineTo(size * 0.45, size)
+  ctx.lineTo(-size * 0.45, size)
+  ctx.lineTo(-size * 0.7, -size * 0.3)
+  ctx.closePath()
+  ctx.fill()
+  ctx.globalAlpha = 0.5
+  ctx.beginPath()
+  ctx.moveTo(0, -size)
+  ctx.lineTo(size * 0.7, -size * 0.3)
+  ctx.lineTo(0, size * 0.1)
+  ctx.closePath()
+  ctx.fill()
+  ctx.restore()
+}
+
+// Simple 4-point sparkle/star, original illustration
+function drawSparkle(ctx, cx, cy, size, color) {
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.fillStyle = color
+  ctx.beginPath()
+  ctx.moveTo(0, -size)
+  ctx.quadraticCurveTo(size * 0.15, -size * 0.15, size, 0)
+  ctx.quadraticCurveTo(size * 0.15, size * 0.15, 0, size)
+  ctx.quadraticCurveTo(-size * 0.15, size * 0.15, -size, 0)
+  ctx.quadraticCurveTo(-size * 0.15, -size * 0.15, 0, -size)
+  ctx.closePath()
+  ctx.fill()
+  ctx.restore()
+}
+
+function drawGemDivider(ctx, x1, x2, y, color) {
+  ctx.strokeStyle = color
+  ctx.globalAlpha = 0.6
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.moveTo(x1, y)
+  ctx.lineTo(x2, y)
+  ctx.stroke()
+  ctx.globalAlpha = 1
+  drawGem(ctx, (x1 + x2) / 2, y, 10, color)
+}
+
+export async function drawRateCard(ctx, data, theme) {
   ctx.clearRect(0, 0, W, H)
 
-  // Background
+  // Background gradient
   const grad = ctx.createLinearGradient(0, 0, 0, H)
-  grad.addColorStop(0, '#1a1410')
-  grad.addColorStop(1, '#2b2016')
+  grad.addColorStop(0, theme.bg[0])
+  grad.addColorStop(1, theme.bg[1])
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, W, H)
 
-  // Gold border frame
-  ctx.strokeStyle = '#C9A227'
+  // Outer + inner gold/silver border frame
+  ctx.strokeStyle = theme.border
   ctx.lineWidth = 6
-  drawRoundedRect(ctx, 30, 30, W - 60, H - 60, 20)
+  drawRoundedRect(ctx, 28, 28, W - 56, H - 56, 20)
   ctx.stroke()
   ctx.lineWidth = 1.5
-  drawRoundedRect(ctx, 44, 44, W - 88, H - 88, 14)
+  drawRoundedRect(ctx, 42, 42, W - 84, H - 84, 14)
   ctx.stroke()
 
+  // Corner sparkle decorations (original vector illustrations)
+  drawSparkle(ctx, 90, 90, 16, theme.accent)
+  drawSparkle(ctx, W - 90, 90, 16, theme.accent)
+  drawSparkle(ctx, 90, H - 90, 16, theme.accent)
+  drawSparkle(ctx, W - 90, H - 90, 16, theme.accent)
+
+  const hasPanel = !!theme.panel
   let y = 130
 
   // Logo
   const logo = await loadImage(data.logoUrl)
   if (logo) {
-    const size = 110
+    const size = 108
     ctx.save()
     ctx.beginPath()
     ctx.arc(W / 2, y, size / 2, 0, Math.PI * 2)
@@ -61,37 +119,38 @@ export async function drawDarkTemplate(ctx, data) {
     ctx.clip()
     ctx.drawImage(logo, W / 2 - size / 2, y - size / 2, size, size)
     ctx.restore()
-    ctx.strokeStyle = '#C9A227'
+    ctx.strokeStyle = theme.border
     ctx.lineWidth = 3
     ctx.beginPath()
     ctx.arc(W / 2, y, size / 2, 0, Math.PI * 2)
     ctx.stroke()
-    y += 90
+    y += 85
+  } else {
+    // decorative gem cluster in place of logo
+    drawGem(ctx, W / 2 - 36, y, 20, theme.accent)
+    drawGem(ctx, W / 2, y - 8, 26, theme.border)
+    drawGem(ctx, W / 2 + 36, y, 20, theme.accent)
+    y += 75
   }
 
   // Business name
   ctx.textAlign = 'center'
-  ctx.fillStyle = '#F5E6B8'
-  ctx.font = '700 54px Georgia, serif'
+  ctx.fillStyle = theme.textPrimary
+  ctx.font = '700 52px Georgia, serif'
   ctx.fillText(data.businessName, W / 2, y)
+  y += 46
+
+  ctx.font = '23px Georgia, serif'
+  ctx.fillStyle = theme.accent
+  ctx.fillText('Gold & Silver Rate', W / 2, y)
+  y += 36
+
+  ctx.font = '20px Arial'
+  ctx.fillStyle = theme.textSecondary
+  ctx.fillText(`as on ${data.date}`, W / 2, y)
   y += 50
 
-  ctx.font = '24px Georgia, serif'
-  ctx.fillStyle = '#C9A227'
-  ctx.fillText('Gold & Silver Rate', W / 2, y)
-  y += 40
-
-  ctx.font = '22px Arial'
-  ctx.fillStyle = '#cbbfa8'
-  ctx.fillText(`as on ${data.date}`, W / 2, y)
-  y += 70
-
-  ctx.strokeStyle = '#C9A227'
-  ctx.lineWidth = 1
-  ctx.beginPath()
-  ctx.moveTo(120, y)
-  ctx.lineTo(W - 120, y)
-  ctx.stroke()
+  drawGemDivider(ctx, 130, W - 130, y, theme.border)
   y += 70
 
   const rows = []
@@ -99,119 +158,56 @@ export async function drawDarkTemplate(ctx, data) {
   if (data.gold24k) rows.push(['24K Gold (1g)', formatMoney(data.gold24k)])
   if (data.silver) rows.push(['Silver (1g)', formatMoney(data.silver)])
 
-  rows.forEach(([label, value]) => {
-    ctx.font = '600 34px Arial'
-    ctx.fillStyle = '#e8ddc4'
-    ctx.textAlign = 'left'
-    ctx.fillText(label, 130, y)
-    ctx.textAlign = 'right'
-    ctx.fillStyle = '#F5CB5C'
-    ctx.font = '700 40px Georgia, serif'
-    ctx.fillText(value, W - 130, y)
-    y += 80
-  })
+  if (hasPanel) {
+    // Light inner panel for rows (maroon-gold style layouts)
+    const panelTop = y - 45
+    const panelHeight = rows.length * 92 + 20
+    ctx.fillStyle = theme.panel
+    drawRoundedRect(ctx, 90, panelTop, W - 180, panelHeight, 16)
+    ctx.fill()
+
+    rows.forEach(([label, value], i) => {
+      const rowY = y + i * 92 + 20
+      if (i % 2 === 1) {
+        ctx.fillStyle = theme.panelAlt
+        ctx.fillRect(110, rowY - 42, W - 220, 76)
+      }
+      ctx.textAlign = 'left'
+      ctx.font = '600 32px Arial'
+      ctx.fillStyle = theme.panelText
+      ctx.fillText(label, 140, rowY + 8)
+      ctx.textAlign = 'right'
+      ctx.font = '700 38px Georgia, serif'
+      ctx.fillStyle = theme.bg[0]
+      ctx.fillText(value, W - 140, rowY + 8)
+    })
+    y = panelTop + panelHeight + 40
+  } else {
+    // Direct-on-background rows (dark themes)
+    rows.forEach(([label, value]) => {
+      ctx.font = '600 34px Arial'
+      ctx.fillStyle = theme.textPrimary
+      ctx.textAlign = 'left'
+      ctx.fillText(label, 130, y)
+      ctx.textAlign = 'right'
+      ctx.fillStyle = theme.accent
+      ctx.font = '700 40px Georgia, serif'
+      ctx.fillText(value, W - 130, y)
+      y += 80
+    })
+    y += 10
+  }
 
   // Footer
-  y = H - 140
-  ctx.strokeStyle = '#C9A227'
-  ctx.beginPath()
-  ctx.moveTo(120, y)
-  ctx.lineTo(W - 120, y)
-  ctx.stroke()
-  y += 45
-  ctx.textAlign = 'center'
-  ctx.font = '22px Arial'
-  ctx.fillStyle = '#cbbfa8'
-  if (data.phone) ctx.fillText(`📞 ${data.phone}`, W / 2, y)
-  y += 34
-  if (data.address) {
-    ctx.font = '18px Arial'
-    ctx.fillText(data.address, W / 2, y)
-  }
-}
-
-export async function drawMaroonTemplate(ctx, data) {
-  ctx.clearRect(0, 0, W, H)
-
-  const grad = ctx.createLinearGradient(0, 0, 0, H)
-  grad.addColorStop(0, '#6B1E2B')
-  grad.addColorStop(1, '#4A1420')
-  ctx.fillStyle = grad
-  ctx.fillRect(0, 0, W, H)
-
-  ctx.strokeStyle = '#E0C15C'
-  ctx.lineWidth = 8
-  drawRoundedRect(ctx, 24, 24, W - 48, H - 48, 24)
-  ctx.stroke()
-
-  // Cream inner card
-  ctx.fillStyle = '#FAF6EE'
-  drawRoundedRect(ctx, 60, 200, W - 120, H - 340, 16)
-  ctx.fill()
-
-  let y = 140
-
-  const logo = await loadImage(data.logoUrl)
-  if (logo) {
-    const size = 100
-    ctx.save()
-    ctx.beginPath()
-    ctx.arc(W / 2, y, size / 2, 0, Math.PI * 2)
-    ctx.closePath()
-    ctx.clip()
-    ctx.drawImage(logo, W / 2 - size / 2, y - size / 2, size, size)
-    ctx.restore()
-    ctx.strokeStyle = '#E0C15C'
-    ctx.lineWidth = 4
-    ctx.beginPath()
-    ctx.arc(W / 2, y, size / 2, 0, Math.PI * 2)
-    ctx.stroke()
-  }
-
-  ctx.textAlign = 'center'
-  ctx.fillStyle = '#F5E6B8'
-  ctx.font = '700 44px Georgia, serif'
-  ctx.fillText(data.businessName, W / 2, 250)
-
-  y = 320
-  ctx.font = '600 30px Georgia, serif'
-  ctx.fillStyle = '#6B1E2B'
-  ctx.fillText("Today's Rate", W / 2, y)
-  y += 36
-  ctx.font = '20px Arial'
-  ctx.fillStyle = '#8a5a5a'
-  ctx.fillText(data.date, W / 2, y)
-  y += 60
-
-  const rows = []
-  if (data.gold22k) rows.push(['22K Gold (1g)', formatMoney(data.gold22k)])
-  if (data.gold24k) rows.push(['24K Gold (1g)', formatMoney(data.gold24k)])
-  if (data.silver) rows.push(['Silver (1g)', formatMoney(data.silver)])
-
-  rows.forEach(([label, value], i) => {
-    const rowY = y + i * 100
-    ctx.fillStyle = i % 2 === 0 ? '#F3EAD3' : '#FAF6EE'
-    ctx.fillRect(100, rowY - 45, W - 200, 80)
-    ctx.textAlign = 'left'
-    ctx.font = '600 32px Arial'
-    ctx.fillStyle = '#4A1420'
-    ctx.fillText(label, 130, rowY + 8)
-    ctx.textAlign = 'right'
-    ctx.font = '700 38px Georgia, serif'
-    ctx.fillStyle = '#6B1E2B'
-    ctx.fillText(value, W - 130, rowY + 8)
-  })
-
-  // Footer on maroon area below card
   let fy = H - 130
+  drawGemDivider(ctx, 130, W - 130, fy - 45, theme.border)
   ctx.textAlign = 'center'
   ctx.font = '22px Arial'
-  ctx.fillStyle = '#F5E6B8'
+  ctx.fillStyle = theme.textSecondary
   if (data.phone) ctx.fillText(`📞 ${data.phone}`, W / 2, fy)
   fy += 32
   if (data.address) {
     ctx.font = '18px Arial'
-    ctx.fillStyle = '#e8d5c4'
     ctx.fillText(data.address, W / 2, fy)
   }
 }
