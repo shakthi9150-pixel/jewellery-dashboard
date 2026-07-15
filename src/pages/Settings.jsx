@@ -12,7 +12,11 @@ export default function Settings() {
   const [newCategory, setNewCategory] = useState('necklace')
 
   const loadGallery = async () => {
-    const { data } = await supabase.from('jewellery_gallery').select('*').order('created_at', { ascending: false })
+    const { data, error } = await supabase.from('jewellery_gallery').select('*').order('created_at', { ascending: false })
+    if (error) {
+      console.error('Failed to load jewellery gallery:', error.message)
+      return
+    }
     setGallery(data || [])
   }
 
@@ -54,7 +58,12 @@ export default function Settings() {
       return
     }
     const { data } = supabase.storage.from('business-assets').getPublicUrl(path)
-    await supabase.from('jewellery_gallery').insert([{ image_url: data.publicUrl, category: newCategory }])
+    const { error: insertErr } = await supabase.from('jewellery_gallery').insert([{ image_url: data.publicUrl, category: newCategory }])
+    if (insertErr) {
+      alert('Photo saved to storage but failed to record it: ' + insertErr.message + '\n\nMost likely cause: supabase/schema_jewellery_gallery.sql has not been run yet.')
+      setUploadingGallery(false)
+      return
+    }
     setUploadingGallery(false)
     e.target.value = ''
     loadGallery()
